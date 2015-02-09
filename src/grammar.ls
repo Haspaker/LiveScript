@@ -153,15 +153,15 @@ bnf =
     o 'ArgList OptComma NEWLINE Arg'                    -> $1 ++ $4
     o 'ArgList OptComma INDENT ArgList OptComma DEDENT' ditto
   Arg:
-    o \Expression
-    o 'Type Expression' -> Typed $1, $2
-    o '... Expression'  -> Splat $2
-    o \...              -> Splat L(Arr!), true
+    o      \Expression
+    o 'Type Expression'  -> Typed $1, $2
+    o '...  Expression'  -> Splat $2
+    o \...               -> Splat L(Arr!), true
 
   Type:
-    o 'TYPE' -> [Var $1]
+    o 'TYPE'           -> [Var $1]
     o 'Type CASE TYPE' -> $1 ++ Var $3
-    o 'Type ?' -> $1 ++ [ Var('n'.toUpperCase! + 'ull'), Var('u'.toUpperCase! + 'ndefined') ]
+    o 'Type ?'         -> $1 ++ [ Var('n'.toUpperCase! + 'ull'), Var('u'.toUpperCase! + 'ndefined') ]
 
   # An optional, trailing comma.
   OptComma:

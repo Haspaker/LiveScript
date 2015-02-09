@@ -9,8 +9,6 @@ require! {
   './util': {name-from-path, strip-string}
 }
 
-util2 = require 'util'
-
 ### Node
 # The abstract base class for all nodes in the syntax tree.
 # Each subclass implements the `compileNode` method, which performs the
@@ -1679,15 +1677,12 @@ class exports.Fun extends Node
     if @front and not @statement then "(#code)" else code
 
   extractTypes: (parameter, params, chain) ->
-
     types = []
-
     if parameter instanceof Typed
       if parameter.expression.name? => chain[*-1] = parameter.expression.name
       parameter.chain = chain
       types.push parameter
       parameter .= expression
-
     if parameter.items?
       for item, j in parameter.items => types ++= @extractTypes item, params, chain ++ j
     return types
@@ -1698,20 +1693,16 @@ class exports.Fun extends Node
         for item, i in parameter.items => @collapseTypes parameter.items[i] = @collapseTypes item
       return parameter
 
-
   compileParams: (o, scope) ->
     {{length}:params, body} = this
     # Remove trailing placeholders.
-    
     for p in params by -1
       break unless p.isEmpty! or p.filler
       --params.length
-
     types = []
     for p, i in params => 
       types ++= @extractTypes p, params, [i]
       params[i] = @collapseTypes p
-
     for p, i in params
       if p instanceof Splat
         @has-splats = true
@@ -1730,7 +1721,7 @@ class exports.Fun extends Node
     assigns = []
     if params.length
       dic = {}
-      for p, i in params
+      for p in params
         vr = p
         vr.=first if df = vr.getDefault!
         if vr.isEmpty!
@@ -1769,7 +1760,6 @@ class exports.Typed extends Node
   reservedTypes: <[ Undefined Null Any ]>
 
   generateCheck: (o, scope, refs) -> 
-
     stringLiteral = (value) -> Literal "'#value'"
 
     identifier = Chain Var refs[ @chain.0 ]

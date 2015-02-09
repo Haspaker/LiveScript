@@ -1079,8 +1079,6 @@ character = if not JSON? then uxxxx else ->
     false
   !function go token, i then tokens.splice i, 0 [\)CALL '' tokens[i-1]2]
 
-# Functions may be optionally called without parentheses for simple cases.
-# Insert the missing parentheses here to aid the parser.
 !function addTypes tokens
   i = 0
   seenParam = false
@@ -1089,8 +1087,10 @@ character = if not JSON? then uxxxx else ->
     if tokens[i-1][0] is \)PARAM => seenParam = false
 
     if seenParam and token[0] is \ID
-      if ( tokens[i+1][0] in <[ID CASE]> ) or ( tokens[i+1][1] in [ \[ \{ ] ) or ( ( tokens[i+1][1] is \?) and ( (tokens[i+2][0] is \ID) or ( tokens[i+2][1] in [ \[ \{ ] ) ) )
-        if ( tokens[i-1][0] is \CASE and tokens[i-2][0] is \TYPE ) or ( tokens[i-1][0] is \PARAM( ) or ( tokens[i-1][1] in [ \, \[, \{ ] )
+      [prev2, prev, next, next2] = tokens[i-2, i-1, i+1, i+2]
+      if ( next[0] in <[ID CASE]> ) or ( next[1] in [ \[ \{ ] ) or 
+          ( next[1] is \? and  ( next2[0] is \ID or next[1] in [ \[ \{ ] ) )
+        if ( prev[0] is \CASE and prev2[0] is \TYPE ) or ( prev[0] is \PARAM( ) or ( prev[1] in [ \, \[, \{ ] )
           token[0] = \TYPE
 
 # Object literals may be written without braces for simple cases.
