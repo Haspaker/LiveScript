@@ -31,7 +31,7 @@ exports import
     addImplicitIndentation it
     rewriteBlockless       it
     addImplicitParentheses it
-    addTypes               it
+    detectTypes            it
     addImplicitBraces      it
     expandLiterals         it
     it.shift! if it.0?0 is \NEWLINE
@@ -1079,7 +1079,7 @@ character = if not JSON? then uxxxx else ->
     false
   !function go token, i then tokens.splice i, 0 [\)CALL '' tokens[i-1]2]
 
-!function addTypes tokens
+!function detectTypes tokens
   i = 0
   seenParam = false
   while token = tokens[++i]
