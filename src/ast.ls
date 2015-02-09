@@ -9,6 +9,8 @@ require! {
   './util': {name-from-path, strip-string}
 }
 
+util2 = require 'util'
+
 ### Node
 # The abstract base class for all nodes in the syntax tree.
 # Each subclass implements the `compileNode` method, which performs the
@@ -275,7 +277,8 @@ class exports.Block extends Node
       --@lines.length if that instanceof Return and not that.it
     this
 
-  compile: (o, level ? o.level) ->
+  compile: (o, level) ->
+    level ?= o.level
     return @compileExpressions o, level if level
     o.block = this; tab = o.indent
     codes = for node in @lines
@@ -358,7 +361,8 @@ class exports.Literal extends Atom
     else
       super ...
 
-  compile: (o, level ? o.level) ->
+  compile: (o, level) ->
+    level ?= o.level
     switch val = "#{@value}"
     | \this      => return o.scope.fun?bound or val
     | \void      =>
@@ -1674,12 +1678,40 @@ class exports.Fun extends Node
     code = curry-code-check!
     if @front and not @statement then "(#code)" else code
 
+  extractTypes: (parameter, params, chain) ->
+
+    types = []
+
+    if parameter instanceof Typed
+      if parameter.expression.name? => chain[*-1] = parameter.expression.name
+      parameter.chain = chain
+      types.push parameter
+      parameter .= expression
+
+    if parameter.items?
+      for item, j in parameter.items => types ++= @extractTypes item, params, chain ++ j
+    return types
+
+  collapseTypes: (parameter) ->
+      if parameter instanceof Typed => parameter .= expression
+      if parameter.items?
+        for item, i in parameter.items => @collapseTypes parameter.items[i] = @collapseTypes item
+      return parameter
+
+
   compileParams: (o, scope) ->
     {{length}:params, body} = this
     # Remove trailing placeholders.
+    
     for p in params by -1
       break unless p.isEmpty! or p.filler
       --params.length
+
+    types = []
+    for p, i in params => 
+      types ++= @extractTypes p, params, [i]
+      params[i] = @collapseTypes p
+
     for p, i in params
       if p instanceof Splat
         @has-splats = true
@@ -1698,7 +1730,7 @@ class exports.Fun extends Node
     assigns = []
     if params.length
       dic = {}
-      for p in params
+      for p, i in params
         vr = p
         vr.=first if df = vr.getDefault!
         if vr.isEmpty!
@@ -1724,8 +1756,35 @@ class exports.Fun extends Node
     if rest
       while splace-- then rest.unshift Arr!
       assigns.push Assign Arr(rest), Literal \arguments
+
+    typechecks = for type in types => type.generateCheck o, scope, names
+    @body.prepend ...typechecks if typechecks.length
     @body.prepend ...assigns if assigns.length
     names.join ', '
+
+class exports.Typed extends Node
+
+  (@types, @expression, @chain = []) ~> @stringyTypes = @types.map (.value)
+
+  reservedTypes: <[ Undefined Null Any ]>
+
+  generateCheck: (o, scope, refs) -> 
+
+    stringLiteral = (value) -> Literal "'#value'"
+
+    identifier = Chain Var refs[ @chain.0 ]
+    for index in @chain[1 to -1]
+      identifier.add Index (if typeof! index is \Number then Literal else Key) index
+
+    for type, i in @stringyTypes => 
+      if type in @reservedTypes then scope.declare type #@types[i] = Var scope.temporary type
+
+    Chain Var (util \typecheck) .add Call do
+      * * identifier
+        * Arr @types
+        * Arr @stringyTypes.map stringLiteral
+        * Arr @chain.map stringLiteral
+
 
 #### Class
 class exports.Class extends Node
@@ -1868,7 +1927,8 @@ class exports.Parens extends Node
 
   unparen: -> if @keep then this else @it.unparen!
 
-  compile: (o, level ? o.level) ->
+  compile: (o, level) ->
+    level ?= o.level
     {it} = this
     it{cond, \void} ||= this
     it.head.hushed = true if @calling and (not level or @void)
@@ -2812,6 +2872,20 @@ UTILS =
       return result;
     }
   }'''
+
+  typecheck: '''function(value, types, types_str, pos) {
+      var known_type;
+      if( value !== value ) known_type = 'NaN';
+      if (value === null) known_type = 'Null';
+      if (value === undefined) known_type = 'Undefined';
+      for(var i = 0, l = types.length; i < l; i++) {
+        if( known_type === 'NaN') if( types_str[i] === 'NaN' ) { return true; } else { continue; } 
+        if( types_str[i] === 'Any' && value !== undefined && value !== null && value === value ) return true;
+        if( typeof value === 'object' && typeof types[i] === 'function' && value instanceof types[i] )  return true;
+        if( {}.toString.call(value).slice(8, -1) === types_str[i] ) return true;
+      }
+      throw TypeError('Expected ' + types_str.join('|').replace(/\\|Null\\|Undefined$/, '?') + ' but got ' + ( known_type || value.constructor.name ) + ' at argument ' + pos.join('.') );
+    }'''
 
   # Shortcuts to speed up the lookup time for native methods.
   split    : "''.split"

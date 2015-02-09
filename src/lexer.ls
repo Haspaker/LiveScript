@@ -31,6 +31,7 @@ exports import
     addImplicitIndentation it
     rewriteBlockless       it
     addImplicitParentheses it
+    addTypes               it
     addImplicitBraces      it
     expandLiterals         it
     it.shift! if it.0?0 is \NEWLINE
@@ -1014,7 +1015,10 @@ character = if not JSON? then uxxxx else ->
 # Insert the missing parentheses here to aid the parser.
 !function addImplicitParentheses tokens
   i = 0; brackets = []
+  seenParam = false
   while token = tokens[++i]
+    if tokens[i-1][0] is \PARAM( => seenParam = true
+    if tokens[i-1][0] is \)PARAM => seenParam = false
     if token.1 is \do and tokens[i+1]0 is \INDENT
       endi = indexOfPair tokens, i+1
       if tokens[endi+1]0 is \NEWLINE and tokens[endi+2]?0 is \WHILE
@@ -1031,7 +1035,7 @@ character = if not JSON? then uxxxx else ->
     if prev.0 is \]
       if brackets.pop! then prev.index = true else continue
     continue unless prev.0 in <[ FUNCTION GENERATOR LET WHERE ]>
-                 or prev.spaced and able tokens, i, true
+                 or prev.spaced and (able tokens, i, true) and !seenParam
     if token.doblock
       token.0 = \CALL(
       tpair.0 = \)CALL
@@ -1074,6 +1078,20 @@ character = if not JSON? then uxxxx else ->
           or pre.0 is \... and pre.spaced
     false
   !function go token, i then tokens.splice i, 0 [\)CALL '' tokens[i-1]2]
+
+# Functions may be optionally called without parentheses for simple cases.
+# Insert the missing parentheses here to aid the parser.
+!function addTypes tokens
+  i = 0
+  seenParam = false
+  while token = tokens[++i]
+    if tokens[i-1][0] is \PARAM( => seenParam = true
+    if tokens[i-1][0] is \)PARAM => seenParam = false
+
+    if seenParam and token[0] is \ID
+      if ( tokens[i+1][0] in <[ID CASE]> ) or ( tokens[i+1][1] in [ \[ \{ ] ) or ( ( tokens[i+1][1] is \?) and ( (tokens[i+2][0] is \ID) or ( tokens[i+2][1] in [ \[ \{ ] ) ) )
+        if ( tokens[i-1][0] is \CASE and tokens[i-2][0] is \TYPE ) or ( tokens[i-1][0] is \PARAM( ) or ( tokens[i-1][1] in [ \, \[, \{ ] )
+          token[0] = \TYPE
 
 # Object literals may be written without braces for simple cases.
 # Insert the missing braces here to aid the parser.
